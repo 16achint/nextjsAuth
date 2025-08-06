@@ -1,46 +1,57 @@
-// import { Connect } from "@/dbconfig/dbConfig";
-// import User from "@/models/userModel";
-// import { NextRequest, NextResponse } from "next/server";
-// import bcryptjs from "bcryptjs";
-// import { sendEmail } from "@/helper/mailer";
+import { Connect } from "@/dbconfig/dbConfig";
+import User from "@/models/userModel";
+import { connect } from "http2";
+import { NextRequest, NextResponse } from "next/server";
+import bcryptjs from "bcryptjs";
+import jwt from "jsonwebtoken";
+Connect();
 
-// Connect();
+export async function POST(request: NextRequest) {
+  try {
+    const reqbody = await request.json();
+    const { email, password } = reqbody;
+    console.log(reqbody);
 
-// export async function POST(request: NextRequest) {
-//   try {
-//     const reqbody = request.json();
-//     const { username, email, password } = reqbody;
-//     console.log(reqbody);
+    const user = await User.findOne(email);
+    if (!user) {
+      return NextResponse.json({ error: "user not found" }, { status: 400 });
+    }
+    console.log("user exists");
 
-//     const user = await User.findOne({ email });
+    const validPassword = await bcryptjs.compare(password, user.password);
+    if (!validPassword) {
+      return NextResponse.json(
+        { message: "password does not match" },
+        { status: 400 }
+      );
+    }
+    const tokenData = {
+      id: user._id,
+      username: user.username,
+      email: user.email,
+    };
 
-//     if (user) {
-//       return NextResponse.json(
-//         { error: "user already exists" },
-//         { status: 400 }
-//       );
-//     }
+    // if (!process.env.TOKEN_SECRET) {
+    //   throw new Error("TOKEN_SECRET environment variable is not defined");
+    // }
+    const token = jwt.sign(tokenData, process.env.TOKEN_SECRET as string, {
+      expiresIn: "1h",
+    });
 
-//     const salt = await bcryptjs.genSalt(10);
-//     const hashpassword = await bcryptjs.hash(password, salt);
+    const response = NextResponse.json(
+      { message: "login successFully", token: token, success: true },
+      { status: 200 }
+    );
 
-//     const newUser = new User({
-//       username: username,
-//       email: email,
-//       password: hashpassword,
-//     });
+    response.cookies.set("token", token, { httpOnly: true });
 
-//     const savedUser = await newUser.save();
-//     console.log(savedUser);
+    return response;
+  } catch (error: unknown) {
+    let errorMessage = "an unknown error is defined";
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    }
 
-//     await sendEmail({ email, emailType: "VERIFY", userId: savedUser._id });
-
-//     return NextResponse.json({
-//       message: "User register successfully",
-//       success: true,
-//       savedUser,
-//     });
-//   } catch (error: any) {
-//     return NextResponse.json({ error: error.message });
-//   }
-// }
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
+  }
+}
