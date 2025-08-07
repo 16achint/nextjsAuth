@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
   try {
     const reqbody = await request.json();
     const { username, email, password } = reqbody;
-    console.log(reqbody);
+    // console.log(reqbody);
 
     const user = await User.findOne({ email });
 
@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     });
 
     const savedUser = await newUser.save();
-    console.log(savedUser);
+    // console.log("savedUser=> ", savedUser);
 
     await sendEmail({ email, emailType: "VERIFY", userId: savedUser._id });
 
